@@ -71,7 +71,7 @@ namespace GeonBit.UI.Examples
             // init graphics device manager and set content root
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
-            Window.IsBorderless = true;
+            Window.IsBorderless = false;
         }
 
         /// <summary>
@@ -82,8 +82,8 @@ namespace GeonBit.UI.Examples
             // make the window fullscreen (but still with border and top control bar)
             int _ScreenWidth = graphics.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
             int _ScreenHeight = graphics.GraphicsDevice.Adapter.CurrentDisplayMode.Height;
-            graphics.PreferredBackBufferWidth = (int)_ScreenWidth;
-            graphics.PreferredBackBufferHeight = (int)_ScreenHeight;
+            graphics.PreferredBackBufferWidth = (int)(_ScreenWidth / 2);
+            graphics.PreferredBackBufferHeight = (int)(_ScreenHeight / 2);
             graphics.IsFullScreen = false;
             graphics.ApplyChanges();
 
