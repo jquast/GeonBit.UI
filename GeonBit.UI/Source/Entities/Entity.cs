@@ -779,7 +779,7 @@ namespace GeonBit.UI.Entities
                 if (recursive)
                 {
                     // search in child
-                    T ret = child.Find<T>(identifier, recursive);
+                    T ret = child.Find<T>(identifier, recursive, skipHidden);
 
                     // if found return it
                     if (ret != null)

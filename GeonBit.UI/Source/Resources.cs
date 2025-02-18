@@ -534,7 +534,12 @@ namespace GeonBit.UI
         /// <returns>Texture instance.</returns>
         public Texture2D LoadTexture(string path)
         {
-            return _content.Load<Texture2D>(Path.Combine(_root, path));
+            try {
+                return _content.Load<Texture2D>(Path.Combine(_root, path));
+            }
+            catch (ContentLoadException) {
+                return _content.Load<Texture2D>(path);
+            }
         }
 
         /// <summary>

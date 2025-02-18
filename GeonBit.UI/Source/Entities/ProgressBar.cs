@@ -123,7 +123,9 @@ namespace GeonBit.UI.Entities
 
             // draw progress bar frame
             Texture2D barTexture = Resources.Instance.ProgressBarTexture;
-            UserInterface.Active.DrawUtils.DrawSurface(spriteBatch, barTexture, _destRect, new Vector2(progressbarFrameWidth, 0f), 1, FillColor);
+            
+            // XXX Disabled by jquast 2/17/25 -- in our game we just want raw horizontal progress bars, no fancy graphics
+            // UserInterface.Active.DrawUtils.DrawSurface(spriteBatch, barTexture, _destRect, new Vector2(progressbarFrameWidth, 0f), 1, FillColor);
 
             // calc frame actual height and scaling factor (this is needed to calc frame width in pixels)
             Vector2 frameSizeTexture = new Vector2(barTexture.Width * progressbarFrameWidth, barTexture.Height);
