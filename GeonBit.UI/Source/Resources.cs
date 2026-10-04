@@ -450,27 +450,32 @@ namespace GeonBit.UI
         /// <returns>T instance loaded from xml file or content manager.</returns>
         private T LoadXml<T>(string name) where T : new()
         {
-            // try to load xml directly from full path
-            string fullPath = Path.Combine(_content.RootDirectory, name + ".xml");
-            if (File.Exists(fullPath))
+            string xmlPath = name + ".xml";
+            string fullPath = Path.Combine(_content.RootDirectory, xmlPath);
+
+            // check if xml file exists before attempting to open (avoid expensive exception)
+            if (!File.Exists(fullPath))
+            {
+                // xml file not found, load xnb instead
+                return _content.Load<T>(name);
+            }
+
+            // load xml using TitleContainer (works with MonoGame's content pipeline)
+            using (var stream = TitleContainer.OpenStream(fullPath))
             {
                 XmlSerializer serializer = new XmlSerializer(typeof(T));
-                using (var reader = File.OpenText(fullPath))
+                XmlDeserializationEvents eventsHandler = new XmlDeserializationEvents()
                 {
-                    XmlDeserializationEvents eventsHandler = new XmlDeserializationEvents()
-                    {
-                        OnUnknownAttribute = (object sender, XmlAttributeEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': invalid attribute '" + e.Attr.Name + "' at line " + e.LineNumber); },
-                        OnUnknownElement = (object sender, XmlElementEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': invalid element '" + e.Element.Name + "' at line " + e.LineNumber); },
-                        OnUnknownNode = (object sender, XmlNodeEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': invalid element '" + e.Name + "' at line " + e.LineNumber); },
-                        OnUnreferencedObject = (object sender, UnreferencedObjectEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': unreferenced object '" + e.UnreferencedObject.ToString() + "'"); },
-                    };
+                    OnUnknownAttribute = (object sender, XmlAttributeEventArgs e) => { throw new Exception("Error parsing file '" + xmlPath + "': invalid attribute '" + e.Attr.Name + "' at line " + e.LineNumber); },
+                    OnUnknownElement = (object sender, XmlElementEventArgs e) => { throw new Exception("Error parsing file '" + xmlPath + "': invalid element '" + e.Element.Name + "' at line " + e.LineNumber); },
+                    OnUnknownNode = (object sender, XmlNodeEventArgs e) => { throw new Exception("Error parsing file '" + xmlPath + "': invalid element '" + e.Name + "' at line " + e.LineNumber); },
+                    OnUnreferencedObject = (object sender, UnreferencedObjectEventArgs e) => { throw new Exception("Error parsing file '" + xmlPath + "': unreferenced object '" + e.UnreferencedObject.ToString() + "'"); },
+                };
+                using (var reader = new StreamReader(stream))
+                {
                     return (T)serializer.Deserialize(System.Xml.XmlReader.Create(reader), eventsHandler);
                 }
             }
-
-            // if xml file not found, try to load xnb instead
-            var ret = _content.Load<T>(name);
-            return ret;
         }
 
         /// <summary>
