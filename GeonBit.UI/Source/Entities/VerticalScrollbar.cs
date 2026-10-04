@@ -27,7 +27,7 @@ namespace GeonBit.UI.Entities
 
         // frame and mark actual height
         float _frameActualHeight = 0f;
-        int _markHeight = 20;
+        int _markHeight = 16;
 
         /// <summary>
         /// If true, will adjust max value automatically based on entities in parent.
@@ -45,8 +45,8 @@ namespace GeonBit.UI.Entities
         /// <param name="anchor">Position anchor.</param>
         /// <param name="offset">Offset from anchor position.</param>
         /// <param name="adjustMaxAutomatically">If true, the scrollbar will set its max value automatically based on entities in its parent.</param>
-        public VerticalScrollbar(uint min, uint max, Anchor anchor = Anchor.Auto, Vector2? offset = null, bool adjustMaxAutomatically = false) :
-            base(0, 0, USE_DEFAULT_SIZE, SliderSkin.Default, anchor, offset)
+        public VerticalScrollbar(uint min, uint max, Anchor anchor = Anchor.Auto, Vector2? offset = null, bool adjustMaxAutomatically = false, SliderSkin skin = SliderSkin.Default) :
+            base(0, 0, USE_DEFAULT_SIZE, skin, anchor, offset)
         {
             // set this scrollbar to respond even when direct parent is locked
             DoEventsIfDirectParentIsLocked = true;

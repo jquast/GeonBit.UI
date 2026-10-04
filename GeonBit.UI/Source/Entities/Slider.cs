@@ -257,20 +257,23 @@ namespace GeonBit.UI.Entities
             mousePos += _lastScrollVal.ToVector2();
 
             // if mouse x is on the 0 side set to min
-            if (mousePos.X <= _destRect.X + _frameActualWidth)
+            if (mousePos.X <= _destRect.X + _frameActualWidth + _markWidth * 0.5f)
             {
                 Value = (int)Min;
             }
             // else if mouse x is on the max side, set to max
-            else if (mousePos.X >= _destRect.Right - _frameActualWidth)
+            else if (mousePos.X >= _destRect.Right - _frameActualWidth - _markWidth * 0.5f)
             {
                 Value = (int)Max;
             }
             // if in the middle calculate value based on mouse position
             else
             {
-                float val = ((mousePos.X - _destRect.X - _frameActualWidth + _markWidth / 2) / (_destRect.Width - _frameActualWidth * 2));
-                Value = (int)(Min + val * (Max - Min));
+                float val = ((mousePos.X - _destRect.X - _frameActualWidth - _markWidth * 0.5f) / (_destRect.Width - _frameActualWidth * 2 - _markWidth));
+                // Add 0.25 bias so slider snaps forward more eagerly
+                int newValue = (int)System.Math.Round(Min + val * (Max - Min) + 0.25);
+                newValue = System.Math.Clamp(newValue, Min, Max);
+                Value = newValue;
             }
 
             // call base handler
