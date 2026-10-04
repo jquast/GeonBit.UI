@@ -311,9 +311,14 @@ namespace GeonBit.UI
         Entity _tooltipTargetEntity;
 
         /// <summary>
-        /// How long to wait before showing tooltip texts.
+        /// How long to wait to begin showing tooltip texts.
         /// </summary>
         public static float TimeToShowTooltipText = 2f;
+
+        /// <summary>
+        /// How long to wait to STOP showing tooltip texts.
+        /// </summary>
+        public static float TimeToStopTooltipText = 2f;
 
         /// <summary>Whether or not to draw the cursor.</summary>
         public bool ShowCursor = true;
@@ -590,7 +595,7 @@ namespace GeonBit.UI
                 // if its time to show tooltip text, create it.
                 // note: we create even if the target have no tooltip text, to allow our custom function to create default tooltip or generate based on entity type.
                 // if the entity should not show tooltip text, the function to generate it should just return null.
-                if (_timeUntilTooltip > TimeToShowTooltipText)
+                if (_timeUntilTooltip > TimeToShowTooltipText && _timeUntilTooltip < TimeToStopTooltipText)
                 {
                     // create tooltip text entity
                     _tooltipEntity = GenerateTooltipFunc(_tooltipTargetEntity);
@@ -601,6 +606,18 @@ namespace GeonBit.UI
                         _tooltipEntity.Locked = true;
                         _tooltipEntity.ClickThrough = true;
                         AddEntity(_tooltipEntity);
+                    }
+                }
+            } else {
+                // decrease time until stop showing tooltip
+                _timeUntilTooltip += (float)gameTime.ElapsedGameTime.TotalSeconds;
+                if(_timeUntilTooltip > TimeToStopTooltipText)
+                {
+                    // if we currently have a tooltip we show, remove it
+                    if (_tooltipEntity != null && _tooltipEntity.Parent != null)
+                    {
+                        _tooltipEntity.RemoveFromParent();
+                        _tooltipEntity = null;
                     }
                 }
             }
