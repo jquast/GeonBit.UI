@@ -291,9 +291,10 @@ namespace GeonBit.UI.Entities
                 // is it last word?
                 bool lastWord = (i == words.Count - 1);
 
-                // get current word and its width
+                // get current word and its width (only add space width if not last word)
                 string word = words[i];
-                int wordWidth = (int)((font.MeasureString(word).X + SingleCharacterSize.X) * fontSize);
+                float spaceWidth = lastWord ? 0 : SingleCharacterSize.X;
+                int wordWidth = (int)((font.MeasureString(word).X + spaceWidth) * fontSize);
 
                 // special case: word itself is longer than line width
                 if (BreakWordsIfMust && wordWidth >= maxLineWidth && word.Length >= 4)
@@ -330,9 +331,11 @@ namespace GeonBit.UI.Entities
                 currWidth += wordWidth;
 
                 // did overflow max width? add line break and reset current width.
-                if (currWidth >= maxLineWidth)
+                if (currWidth > maxLineWidth)
                 {
                     ret.Append('\n');
+                    // TODO(jquast): prefix ? idk .. maybe we are listing text
+                    // wrong, then ..
                     ret.Append(word);
                     if (!lastWord) ret.Append(' ');
                     currWidth = wordWidth;
