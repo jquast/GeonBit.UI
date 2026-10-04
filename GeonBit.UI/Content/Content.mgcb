@@ -13,12 +13,6 @@
 
 #---------------------------------- Content ---------------------------------#
 
-#begin BuiltEffects/disabled.xnb
-/copy:BuiltEffects/disabled.xnb
-
-#begin BuiltEffects/silhouette.xnb
-/copy:BuiltEffects/silhouette.xnb
-
 #begin Example/btn_default.png
 /importer:TextureImporter
 /processor:TextureProcessor
