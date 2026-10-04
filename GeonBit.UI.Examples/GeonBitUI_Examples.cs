@@ -328,7 +328,7 @@ namespace GeonBit.UI.Examples
                     UserInterface.Active.AddEntity(panel);
 
                     // add title and text
-                    Image title = new Image(Content.Load<Texture2D>("example/GeonBitUI-sm"), new Vector2(400, 240), anchor: Anchor.TopCenter, offset: new Vector2(0, -20));
+                    Image title = new Image(Content.Load<Texture2D>("Example/GeonBitUI-sm"), new Vector2(400, 240), anchor: Anchor.TopCenter, offset: new Vector2(0, -20));
                     title.ShadowColor = new Color(0, 0, 0, 128);
                     title.ShadowOffset = Vector2.One * -6;
                     panel.AddChild(title);
@@ -436,9 +436,9 @@ The most common anchors are 'Auto' and 'AutoInline', which will place entities o
                     // custom button
                     Button custom = new Button("Custom Skin", ButtonSkin.Default, size: new Vector2(0, 80));
                     custom.SetCustomSkin(
-                        Content.Load<Texture2D>("example/btn_default"),
-                        Content.Load<Texture2D>("example/btn_hover"),
-                        Content.Load<Texture2D>("example/btn_down"));
+                        Content.Load<Texture2D>("Example/btn_default"),
+                        Content.Load<Texture2D>("Example/btn_hover"),
+                        Content.Load<Texture2D>("Example/btn_down"));
                     panel.AddChild(custom);
 
                     // toggle button
@@ -511,7 +511,7 @@ The most common anchors are 'Auto' and 'AutoInline', which will place entities o
                     }
                     {
                         Panel intPanel = new Panel(new Vector2(0, panelHeight * 2), PanelSkin.ListBackground, Anchor.Auto);
-                        intPanel.SetCustomSkin(Content.Load<Texture2D>("example/btn_default"));
+                        intPanel.SetCustomSkin(Content.Load<Texture2D>("Example/btn_default"));
                         intPanel.AddChild(new Paragraph("Custom Skin", Anchor.Center));
                         panel.AddChild(intPanel);
                     }
@@ -1355,7 +1355,7 @@ Maybe something interesting in tab3?"));
                     panel.AddChild(new Paragraph("And as always, you can also set your own custom cursor:"));
                     {
                         Button btn = new Button("Custom", ButtonSkin.Default);
-                        btn.OnMouseEnter = (Entity entity) => { UserInterface.Active.SetCursor(Content.Load<Texture2D>("example/cursor"), 40); };
+                        btn.OnMouseEnter = (Entity entity) => { UserInterface.Active.SetCursor(Content.Load<Texture2D>("Example/cursor"), 40); };
                         btn.OnMouseLeave = (Entity entity) => { UserInterface.Active.SetCursor(CursorType.Default); };
                         panel.AddChild(btn);
                     }
@@ -1405,13 +1405,13 @@ Maybe something interesting in tab3?"));
                     // custom icons
                     panel.AddChild(new Paragraph("Custom icons / images:"));
                     Icon icon = new Icon(IconType.None, Anchor.AutoInline, 1, true, new Vector2(12, 10));
-                    icon.Texture = Content.Load<Texture2D>("example/warrior");
+                    icon.Texture = Content.Load<Texture2D>("Example/warrior");
                     panel.AddChild(icon);
                     icon = new Icon(IconType.None, Anchor.AutoInline, 1, true, new Vector2(12, 10));
-                    icon.Texture = Content.Load<Texture2D>("example/monk");
+                    icon.Texture = Content.Load<Texture2D>("Example/monk");
                     panel.AddChild(icon);
                     icon = new Icon(IconType.None, Anchor.AutoInline, 1, true, new Vector2(12, 10));
-                    icon.Texture = Content.Load<Texture2D>("example/mage");
+                    icon.Texture = Content.Load<Texture2D>("Example/mage");
                     panel.AddChild(icon);
                 }
 
@@ -1463,9 +1463,9 @@ Click on 'Next' to see the character creation demo."));
                     centerPanel.AddChild(charPreviewPanel);
 
                     // create preview pics of character
-                    Image previewImage = new Image(Content.Load<Texture2D>("example/warrior"), Vector2.Zero, anchor: Anchor.Center);
-                    Image previewImageColor = new Image(Content.Load<Texture2D>("example/warrior_color"), Vector2.Zero, anchor: Anchor.Center);
-                    Image previewImageSkin = new Image(Content.Load<Texture2D>("example/warrior_skin"), Vector2.Zero, anchor: Anchor.Center);
+                    Image previewImage = new Image(Content.Load<Texture2D>("Example/warrior"), Vector2.Zero, anchor: Anchor.Center);
+                    Image previewImageColor = new Image(Content.Load<Texture2D>("Example/warrior_color"), Vector2.Zero, anchor: Anchor.Center);
+                    Image previewImageSkin = new Image(Content.Load<Texture2D>("Example/warrior_skin"), Vector2.Zero, anchor: Anchor.Center);
                     charPreviewPanel.AddChild(previewImage);
                     charPreviewPanel.AddChild(previewImageColor);
                     charPreviewPanel.AddChild(previewImageSkin);
@@ -1493,9 +1493,9 @@ Click on 'Next' to see the character creation demo."));
                     classTypes.OnValueChange = (Entity entity) =>
                     {
                         string texture = ((SelectList)(entity)).SelectedValue.ToLower();
-                        previewImage.Texture = Content.Load<Texture2D>("example/" + texture);
-                        previewImageColor.Texture = Content.Load<Texture2D>("example/" + texture + "_color");
-                        previewImageSkin.Texture = Content.Load<Texture2D>("example/" + texture + "_skin");
+                        previewImage.Texture = Content.Load<Texture2D>("Example/" + texture);
+                        previewImageColor.Texture = Content.Load<Texture2D>("Example/" + texture + "_color");
+                        previewImageSkin.Texture = Content.Load<Texture2D>("Example/" + texture + "_skin");
                     };
 
                     // create color selection buttons
