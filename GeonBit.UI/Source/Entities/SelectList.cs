@@ -10,6 +10,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Generic;
+using GeonBit.UI.DataTypes;
 using GeonBit.UI.Utils;
 
 
@@ -52,7 +53,7 @@ namespace GeonBit.UI.Entities
         List<Paragraph> _paragraphs = new List<Paragraph>();
 
         // scrollbar to scroll through the list
-        VerticalScrollbar _scrollbar;
+        public VerticalScrollbar _scrollbar;
 
         // indicate that we had a resize event while not being visible
         bool _hadResizeWhileNotVisible = false;
@@ -93,6 +94,18 @@ namespace GeonBit.UI.Entities
 
         // icons to add next to paragraphs
         Dictionary<int, string> _icons = new Dictionary<int, string>();
+
+        // per-item background colors (unselected state)
+        Dictionary<int, Color> _itemBackgroundColors = new Dictionary<int, Color>();
+
+        // per-item text colors (unselected state)
+        Dictionary<int, Color> _itemTextColors = new Dictionary<int, Color>();
+
+        // per-item background colors (selected state)
+        Dictionary<int, Color> _itemSelectedBackgroundColors = new Dictionary<int, Color>();
+
+        // per-item text colors (selected state)
+        Dictionary<int, Color> _itemSelectedTextColors = new Dictionary<int, Color>();
 
         /// <summary>When set to true, users cannot change the currently selected value.
         /// Note: unlike the basic entity "Locked" that prevent all input from entity and its children,
@@ -142,14 +155,14 @@ namespace GeonBit.UI.Entities
         /// <param name="anchor">Position anchor.</param>
         /// <param name="offset">Offset from anchor position.</param>
         /// <param name="skin">SelectList skin, eg which texture to use.</param>
-        public SelectList(Vector2 size, Anchor anchor = Anchor.Auto, Vector2? offset = null, PanelSkin skin = PanelSkin.ListBackground) :
+        public SelectList(Vector2 size, Anchor anchor = Anchor.Auto, Vector2? offset = null, PanelSkin skin = PanelSkin.ListBackground, SliderSkin sliderSkin = SliderSkin.Default) :
             base(size, skin, anchor, offset)
         {
             // update style and set default padding
             UpdateStyle(DefaultStyle);
 
             // create the scrollbar
-            _scrollbar = new VerticalScrollbar(0, 10, Anchor.CenterRight, offset: new Vector2(-8, 0));
+            _scrollbar = new VerticalScrollbar(0, 10, Anchor.CenterRight, offset: new Vector2(-8, 0), skin: sliderSkin);
             _scrollbar.Value = 0;
             _scrollbar.Visible = false;
             _scrollbar._hiddenInternalEntity = true;
@@ -291,6 +304,49 @@ namespace GeonBit.UI.Entities
                 }
                 index++;
             }
+        }
+
+        /// <summary>
+        /// Clear all per-item colors.
+        /// </summary>
+        public void ClearItemColors()
+        {
+            _itemBackgroundColors.Clear();
+            _itemTextColors.Clear();
+            _itemSelectedBackgroundColors.Clear();
+            _itemSelectedTextColors.Clear();
+        }
+
+        /// <summary>
+        /// Set colors for a specific item index.
+        /// </summary>
+        /// <param name="index">Item index.</param>
+        /// <param name="backgroundColor">Background color when unselected (null to use default).</param>
+        /// <param name="textColor">Text color when unselected (null to use default).</param>
+        /// <param name="selectedBackgroundColor">Background color when selected (null to use default).</param>
+        /// <param name="selectedTextColor">Text color when selected (null to use default).</param>
+        public void SetItemColors(int index, Color? backgroundColor, Color? textColor,
+            Color? selectedBackgroundColor = null, Color? selectedTextColor = null)
+        {
+            if (backgroundColor.HasValue)
+                _itemBackgroundColors[index] = backgroundColor.Value;
+            else if (_itemBackgroundColors.ContainsKey(index))
+                _itemBackgroundColors.Remove(index);
+
+            if (textColor.HasValue)
+                _itemTextColors[index] = textColor.Value;
+            else if (_itemTextColors.ContainsKey(index))
+                _itemTextColors.Remove(index);
+
+            if (selectedBackgroundColor.HasValue)
+                _itemSelectedBackgroundColors[index] = selectedBackgroundColor.Value;
+            else if (_itemSelectedBackgroundColors.ContainsKey(index))
+                _itemSelectedBackgroundColors.Remove(index);
+
+            if (selectedTextColor.HasValue)
+                _itemSelectedTextColors[index] = selectedTextColor.Value;
+            else if (_itemSelectedTextColors.ContainsKey(index))
+                _itemSelectedTextColors.Remove(index);
         }
 
         /// <summary>
@@ -778,6 +834,16 @@ namespace GeonBit.UI.Entities
                     par.BackgroundColor.A = 0;
                     par.Visible = true;
 
+                    // apply per-item colors (unselected state)
+                    if (_itemBackgroundColors.TryGetValue(item_index, out Color bgColor))
+                    {
+                        par.BackgroundColor = bgColor;
+                    }
+                    if (_itemTextColors.TryGetValue(item_index, out Color textColor))
+                    {
+                        par.FillColor = textColor;
+                    }
+
                     // set icon
                     if (_icons.TryGetValue(item_index, out string texturePath))
                     {
@@ -850,7 +916,21 @@ namespace GeonBit.UI.Entities
                     Paragraph paragraph = _paragraphs[i];
                     paragraph.GetActualDestRect();
                     paragraph.State = EntityState.MouseDown;
-                    paragraph.BackgroundColor = GetActiveStyle("SelectedHighlightColor").asColor;
+
+                    // use per-item selected colors if available, otherwise use default
+                    if (_itemSelectedBackgroundColors.TryGetValue(selectedParagraphIndex, out Color selBgColor))
+                    {
+                        paragraph.BackgroundColor = selBgColor;
+                    }
+                    else
+                    {
+                        paragraph.BackgroundColor = GetActiveStyle("SelectedHighlightColor").asColor;
+                    }
+
+                    if (_itemSelectedTextColors.TryGetValue(selectedParagraphIndex, out Color selTextColor))
+                    {
+                        paragraph.SetStyleProperty(StylePropertyIds.FillColor, new StyleProperty(selTextColor), EntityState.MouseDown);
+                    }
                 }
             }
         }
