@@ -277,3 +277,6 @@ __pycache__/
 # tools/
 nuget.exe
 GeonBit.UI/Content/GeonBit.UI.DataTypes.dll
+
+# Local build environment (copy .env.example to .env)
+.env
