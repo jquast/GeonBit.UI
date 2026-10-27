@@ -61,6 +61,9 @@ namespace GeonBit.UI.Entities
         /// <summary>Extra space (in pixels) between items on Y axis.</summary>
         public int ExtraSpaceBetweenLines = 0;
 
+        /// <summary>Maximum height used when matching the list to its items; 0 means no limit.</summary>
+        public int MaxHeight = 0;
+
         /// <summary>Scale items in list.</summary>
         public float ItemsScale = 1f;
 
@@ -94,6 +97,8 @@ namespace GeonBit.UI.Entities
 
         // icons to add next to paragraphs
         Dictionary<int, string> _icons = new Dictionary<int, string>();
+        // Icons pinned to the right edge of an item, drawn without shifting its text.
+        Dictionary<int, Texture2D> _rightIcons = new Dictionary<int, Texture2D>();
 
         // per-item background colors (unselected state)
         Dictionary<int, Color> _itemBackgroundColors = new Dictionary<int, Color>();
@@ -269,6 +274,22 @@ namespace GeonBit.UI.Entities
         public void ClearIcons()
         {
             _icons.Clear();
+            _rightIcons.Clear();
+        }
+
+        /// <summary>
+        /// Set a texture drawn at the right edge of an item, or null to remove it.
+        /// </summary>
+        public void SetRightIcon(Texture2D texture, int index)
+        {
+            if (texture == null)
+            {
+                if (_rightIcons.ContainsKey(index)) { _rightIcons.Remove(index); }
+            }
+            else
+            {
+                _rightIcons[index] = texture;
+            }
         }
 
         /// <summary>
@@ -451,6 +472,10 @@ namespace GeonBit.UI.Entities
 
             // get height of a single paragraph and calculate size from it
             var height = _valuesList.Count * (_paragraphs[0].GetCharacterActualSize().Y / GlobalScale + _paragraphs[0].SpaceAfter.Y) + Padding.Y * 2;
+            if (MaxHeight > 0 && height > MaxHeight)
+            {
+                height = MaxHeight;
+            }
             Size = new Vector2(Size.X, height);
         }
 
@@ -867,6 +892,32 @@ namespace GeonBit.UI.Entities
                     else if (par.Children.Count > 0)
                     {
                         par.Find("__ListIcon__")?.RemoveFromParent();
+                    }
+
+                    if (_rightIcons.TryGetValue(item_index, out Texture2D rightTexture))
+                    {
+                        var icon = par.Find("__ListRightIcon__") as Image;
+                        if (icon == null || icon.Texture != rightTexture)
+                        {
+                            icon?.RemoveFromParent();
+                            icon = new Image(rightTexture, anchor: Anchor.TopLeft);
+                            icon.Identifier = "__ListRightIcon__";
+                            par.AddChild(icon);
+                        }
+                        // The row paragraph is only as wide as its text, so the icon is placed
+                        // from the list's inner edge rather than from the paragraph's own edge.
+                        var height = par.Size.Y * 0.82f;
+                        var width = height * rightTexture.Width / rightTexture.Height;
+                        icon.Size = new Vector2(width, height);
+                        // Measured against the list: the row's child lands a sprite width right and
+                        // a sprite height low, so both are taken back out before the inset.
+                        icon.Offset = new Vector2(
+                            _destRectInternal.Width - (width * 2) - 2,
+                            (par.Size.Y - height) / 2f - height - 10f);
+                    }
+                    else
+                    {
+                        par.Find("__ListRightIcon__")?.RemoveFromParent();
                     }
 
                     // check if we need to trim size

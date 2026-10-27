@@ -268,6 +268,26 @@ namespace GeonBit.UI
         /// <summary>Default font types.</summary>
         public SpriteFont[] Fonts;
 
+        public const int BaseFontPixelSize = 15;
+
+        private static readonly int[] ScriptSizes = { 16, 32, 64 };
+
+        public FontLadder[] FontLadders;
+
+        public FontLadder[] FallbackLadders;
+
+        public FontLadder BodyLadder;
+
+        public FontLadder[] BodyFallbackLadders;
+
+        public FontLadder BodyBoldLadder;
+
+        public FontLadder[] BodyBoldFallbackLadders;
+
+        public FontLadder CaptionLadder;
+
+        public FontLadder[] CaptionFallbackLadders;
+
         /// <summary>Effect for disabled entities (greyscale).</summary>
         public Effect DisabledEffect;
 
@@ -354,11 +374,57 @@ namespace GeonBit.UI
             }
 
             // load fonts
-            Fonts = new SpriteFont[Enum.GetValues(typeof(FontStyle)).Length];
-            foreach (FontStyle style in Enum.GetValues(typeof(FontStyle)))
+            FontLadder LoadLadder(string root, int[] sizes)
             {
-                Fonts[(int)style] = content.Load<SpriteFont>(_root + "fonts/" + style.ToString());
+                var faces = new List<FontFace>();
+                foreach (int size in sizes)
+                {
+                    string asset = size == sizes[0] ? root : root + "-" + size;
+                    faces.Add(new FontFace(size, content.Load<SpriteFont>(asset)));
+                }
+                return new FontLadder(faces);
             }
+
+            Fonts = new SpriteFont[Enum.GetValues(typeof(FontStyle)).Length];
+            FontLadders = new FontLadder[Fonts.Length];
+            int[] regularSizes = { 18, 36, 72, 144 };
+            int[] boldSizes = { 18, 36, 72 };
+            foreach (FontStyle style in new[] { FontStyle.Regular, FontStyle.Bold })
+            {
+                int[] sizes = style == FontStyle.Bold ? boldSizes : regularSizes;
+                FontLadders[(int)style] = LoadLadder(_root + "fonts/" + style, sizes);
+                Fonts[(int)style] = FontLadders[(int)style].Faces[0].Font;
+            }
+            FontLadders[(int)FontStyle.Italic] = FontLadders[(int)FontStyle.Regular];
+            Fonts[(int)FontStyle.Italic] = Fonts[(int)FontStyle.Regular];
+            FallbackLadders = new[]
+            {
+                LoadLadder(_root + "fonts/Japanese", ScriptSizes),
+                LoadLadder(_root + "fonts/Korean", ScriptSizes),
+            };
+            BodyLadder = LoadLadder(_root + "fonts/Body", new[] { 15, 30, 60 });
+            BodyFallbackLadders = new[]
+            {
+                FontLadders[(int)FontStyle.Regular],
+                FallbackLadders[0],
+                FallbackLadders[1],
+            };
+            BodyBoldLadder = LoadLadder(_root + "fonts/BodyBold", new[] { 15, 30, 60 });
+            BodyBoldFallbackLadders = new[]
+            {
+                FontLadders[(int)FontStyle.Bold],
+                FallbackLadders[0],
+                FallbackLadders[1],
+            };
+            CaptionLadder = LoadLadder(_root + "fonts/Caption", new[] { 12, 15 });
+            CaptionLadder.Nearest = true;
+            CaptionLadder.PreferNative = true;
+            CaptionFallbackLadders = new[]
+            {
+                FontLadders[(int)FontStyle.Regular],
+                FallbackLadders[0],
+                FallbackLadders[1],
+            };
 
             // load buttons metadata
             ButtonData = new TextureData[Enum.GetValues(typeof(ButtonSkin)).Length];

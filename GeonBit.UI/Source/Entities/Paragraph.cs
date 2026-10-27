@@ -117,7 +117,6 @@ namespace GeonBit.UI.Entities
 
         /// <summary>If the outline width is less than this value, the outline will be optimized but will appear slightly less sharp on corners.</summary>
         protected static int MaxOutlineWidthToOptimize = 1;
-
         /// <summary>
         /// Actual processed text to display (after word-wrap etc).
         /// </summary>
@@ -132,6 +131,26 @@ namespace GeonBit.UI.Entities
         /// Calculated, final text scale.
         /// </summary>
         protected float _actualScale;
+
+        protected FontFace _primaryFace;
+
+        private FontFace _overrideFace;
+
+        protected readonly List<FontFace> _fallbackFaces = new List<FontFace>();
+
+        private List<List<TextRun>> _lineRuns;
+
+        protected float _targetPixelSize;
+
+        public FontLadder FontLadderOverride = null;
+
+        public List<FontLadder> FallbackLadders = new List<FontLadder>();
+
+        public static bool ThickOutline = false;
+
+        public static bool BoldBody = true;
+
+        private bool _appliedBoldBody;
 
         /// <summary>
         /// Calculated text position.
@@ -231,8 +250,7 @@ namespace GeonBit.UI.Entities
         /// <returns>Actual size, in pixels, of a single character.</returns>
         public Vector2 GetCharacterActualSize()
         {
-            float scale = Scale * BaseSize * GlobalScale;
-            return SingleCharacterSize * scale;
+            return SingleCharacterSize;
         }
 
         /// <summary>
@@ -255,7 +273,7 @@ namespace GeonBit.UI.Entities
         /// <param name="maxLineWidth">Max line width to wrap.</param>
         /// <param name="fontSize">Font scale (scale you are about to use when drawing the text).</param>
         /// <returns>Text that is wrapped to fit the given length (by adding line breaks at the right places).</returns>
-        public string WrapText(SpriteFont font, string text, float maxLineWidth, float fontSize)
+        public string WrapText(string text, float maxLineWidth)
         {
             // invalid width (can happen during init steps - skip
             if (maxLineWidth <= 0) { return text; }
@@ -272,7 +290,7 @@ namespace GeonBit.UI.Entities
                 // iterate lines and wrap them
                 foreach (string line in lines)
                 {
-                    ret.AppendLine(WrapText(font, line, maxLineWidth, fontSize));
+                    ret.AppendLine(WrapText(line, maxLineWidth));
                 }
 
                 // remove the last extra linebreak that was added in this process and return.
@@ -294,17 +312,17 @@ namespace GeonBit.UI.Entities
                 // get current word and its width (only add space width if not last word)
                 string word = words[i];
                 float spaceWidth = lastWord ? 0 : SingleCharacterSize.X;
-                int wordWidth = (int)((font.MeasureString(word).X + spaceWidth) * fontSize);
+                int wordWidth = (int)(MeasureText(word).X + spaceWidth);
 
                 // special case: word itself is longer than line width
                 if (BreakWordsIfMust && wordWidth >= maxLineWidth && word.Length >= 4)
                 {
                     // find breaking position
                     int breakPos = 0;
-                    int currWordWidth = (int)(SingleCharacterSize.X * fontSize);
+                    int currWordWidth = (int)SingleCharacterSize.X;
                     foreach (char c in word)
                     {
-                        currWordWidth += (int)(font.MeasureString(c.ToString()).X * fontSize);
+                        currWordWidth += (int)MeasureText(c.ToString()).X;
                         if (currWordWidth >= maxLineWidth)
                         {
                             break;
@@ -394,7 +412,7 @@ namespace GeonBit.UI.Entities
         /// <returns>Current font.</returns>
         protected SpriteFont GetCurrFont()
         {
-            return FontOverride ?? Resources.Instance.Fonts[(int)TextStyle];
+            return FontOverride ?? _currFont ?? Resources.Instance.Fonts[(int)TextStyle];
         }
 
         /// <summary>
@@ -415,20 +433,51 @@ namespace GeonBit.UI.Entities
         /// </summary>
         private void UpdateFontPropertiesIfNeeded()
         {
-            SpriteFont font = GetCurrFont();
-            if (font != _currFont)
+            bool body = TextStyle == FontStyle.Regular || TextStyle == FontStyle.Italic;
+            bool boldBody = body && BoldBody && FontLadderOverride == null;
+            FontLadder ladder = FontLadderOverride
+                ?? (boldBody ? Resources.Instance.BodyBoldLadder
+                    : body ? Resources.Instance.BodyLadder
+                    : Resources.Instance.FontLadders[(int)TextStyle]);
+            float target = Scale * BaseSize * GlobalScale * Resources.BaseFontPixelSize;
+            FontFace primary = FontOverride != null
+                ? (_overrideFace ??= new FontFace(Resources.BaseFontPixelSize, FontOverride))
+                : ladder.Pick(target);
+
+            if (primary == _primaryFace && target == _targetPixelSize && boldBody == _appliedBoldBody)
             {
-                // mark as dirty so we'll recalculate positions and line breaks
-                MarkAsDirty();
+                return;
+            }
 
-                // set font and get single character size
-                _currFont = font;
-                SingleCharacterSize = _currFont.MeasureString(" ");
+            MarkAsDirty();
+            _primaryFace = primary;
+            _currFont = primary.Font;
+            _targetPixelSize = target;
+            _appliedBoldBody = boldBody;
+            float residual = FontOverride != null
+                ? Scale * BaseSize * GlobalScale
+                : target / primary.PixelSize;
+            if (FontOverride == null && ladder.PreferNative && System.Math.Abs(residual - 1f) <= 0.1f)
+            {
+                residual = 1f;
+            }
+            _actualScale = residual;
+            SingleCharacterSize = _currFont.MeasureString(" ") * _actualScale;
 
-                // sanity test
-                if ((SingleCharacterSize.X * 2) != _currFont.MeasureString("!.").X)
+            _fallbackFaces.Clear();
+            var fallbacks = FallbackLadders.Count > 0
+                ? (IEnumerable<FontLadder>)FallbackLadders
+                : (boldBody
+                    ? Resources.Instance.BodyBoldFallbackLadders
+                    : body && FontLadderOverride == null
+                        ? Resources.Instance.BodyFallbackLadders
+                        : Resources.Instance.FallbackLadders);
+            foreach (var fallback in fallbacks)
+            {
+                var face = fallback.PickNative(target);
+                if (face != null && face != primary)
                 {
-                    throw new Exceptions.InvalidValueException("Cannot use non-monospace fonts!");
+                    _fallbackFaces.Add(face);
                 }
             }
         }
@@ -441,19 +490,11 @@ namespace GeonBit.UI.Entities
             // update font properties
             UpdateFontPropertiesIfNeeded();
 
-            // calc actual scale
-            float actualScale = Scale * BaseSize * GlobalScale;
-            if (actualScale != _actualScale)
-            {
-                _actualScale = actualScale;
-                MarkAsDirty();
-            }
-
             // get text and add things like line-breaks to wrap words etc.
             string newProcessedText = Text;
             if (WrapWords)
             {
-                newProcessedText = WrapText(_currFont, newProcessedText, _destRect.Width, _actualScale);
+                newProcessedText = WrapText(newProcessedText, _destRect.Width);
             }
 
             // if processed text changed
@@ -462,13 +503,14 @@ namespace GeonBit.UI.Entities
                 _processedText = newProcessedText;
                 MarkAsDirty();
             }
+            BuildRuns();
 
             // due to the mechanism of calculating destination rect etc based on parent and anchor,
             // to set text alignment all we need to do is keep the size the actual text size.
             // so we just update _size every frame and the text alignemtn (left, right, center..) fix itself by the destination rect.
             _fontOrigin = Vector2.Zero;
             _position = new Vector2(_destRect.X, _destRect.Y);
-            Vector2 size = _currFont.MeasureString(_processedText);
+            Vector2 size = MeasureText(_processedText);
 
             // set position and origin based on anchor.
             // note: no top-left here because thats the default set above.
@@ -521,10 +563,10 @@ namespace GeonBit.UI.Entities
             }
 
             // set actual height
-            _actualDestRect.X = (int)_position.X - (int)(_fontOrigin.X * _actualScale);
-            _actualDestRect.Y = (int)_position.Y - (int)(_fontOrigin.Y * _actualScale);
-            _actualDestRect.Width = (int)((size.X) * _actualScale);
-            _actualDestRect.Height = (int)((size.Y) * _actualScale);
+            _actualDestRect.X = (int)_position.X - (int)_fontOrigin.X;
+            _actualDestRect.Y = (int)_position.Y - (int)_fontOrigin.Y;
+            _actualDestRect.Width = (int)size.X;
+            _actualDestRect.Height = (int)size.Y;
 
             // apply min size
             if (MinSize != null)
@@ -602,8 +644,7 @@ namespace GeonBit.UI.Entities
             Color fillCol = UserInterface.Active.DrawUtils.FixColorOpacity(FillColor);
 
             // draw text itself
-            spriteBatch.DrawString(_currFont, _processedText, _position, fillCol,
-                Rotation, _fontOrigin, _actualScale, SpriteEffects.None, 0.5f);
+            DrawTextRuns(spriteBatch, _processedText, fillCol, _position, _fontOrigin, Rotation, 0.5f);
 
             // call base draw function
             base.DrawEntity(spriteBatch, phase);
@@ -616,43 +657,203 @@ namespace GeonBit.UI.Entities
         /// <param name="outlineWidth">Outline width.</param>
         protected void DrawTextOutline(SpriteBatch spriteBatch, int outlineWidth)
         {
-            // get outline color
+            int width = ThickOutline ? System.Math.Max(outlineWidth, 2) : outlineWidth;
             Color outlineColor = UserInterface.Active.DrawUtils.FixColorOpacity(OutlineColor);
-            DrawTextOutline(spriteBatch, _processedText, outlineWidth, _currFont, _actualScale, _position, outlineColor, _fontOrigin);
+            Vector2 aligned = AlignedTopLeft(_position, _fontOrigin);
+            for (int dx = -width; dx <= width; dx++)
+            {
+                for (int dy = -width; dy <= width; dy++)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+                    DrawTextRunsAt(spriteBatch, _processedText, outlineColor, aligned + new Vector2(dx, dy), Rotation, 0.5f);
+                }
+            }
         }
 
-        /// <summary>
-        /// Draw text outline.
-        /// </summary>
-        /// <param name="spriteBatch">Sprite batch to use.</param>
-        /// <param name="text">Text to draw outline for.</param>
-        /// <param name="outlineWidth">Outline width.</param>
-        /// <param name="font">Text font.</param>
-        /// <param name="scale">Text absolute scale.</param>
-        /// <param name="position">Text position.</param>
-        /// <param name="outlineColor">Outline color.</param>
-        /// <param name="origin">Text origin.</param>
         protected void DrawTextOutline(SpriteBatch spriteBatch, string text, int outlineWidth, SpriteFont font, float scale, Vector2 position, Color outlineColor, Vector2 origin)
         {
-            // for not-too-thick outline we render just two corners
-            if (outlineWidth <= MaxOutlineWidthToOptimize)
+            int width = ThickOutline ? System.Math.Max(outlineWidth, 2) : outlineWidth;
+            for (int dx = -width; dx <= width; dx++)
             {
-                spriteBatch.DrawString(font, text, position + Vector2.One * outlineWidth, outlineColor,
-                    Rotation, origin, scale, SpriteEffects.None, 0.5f);
-                spriteBatch.DrawString(font, text, position - Vector2.One * outlineWidth, outlineColor,
-                    Rotation, origin, scale, SpriteEffects.None, 0.5f);
+                for (int dy = -width; dy <= width; dy++)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+                    spriteBatch.DrawString(font, text, position + new Vector2(dx, dy), outlineColor,
+                        Rotation, origin, scale, SpriteEffects.None, 0.5f);
+                }
             }
-            // for really thick outline we need to cover the other corners as well
-            else
+        }
+
+        private static bool IsCjk(char c)
+        {
+            return (c >= '\u3000' && c <= '\u30FF')
+                || (c >= '\u4E00' && c <= '\u9FFF')
+                || (c >= '\uAC00' && c <= '\uD7A3')
+                || (c >= '\uFF00' && c <= '\uFFEF');
+        }
+
+        private FontFace FindFace(char c)
+        {
+            if (_primaryFace.Characters.Contains(c))
             {
-                spriteBatch.DrawString(font, text, position + Vector2.UnitX * outlineWidth, outlineColor,
-                    Rotation, origin, scale, SpriteEffects.None, 0.5f);
-                spriteBatch.DrawString(font, text, position - Vector2.UnitX * outlineWidth, outlineColor,
-                    Rotation, origin, scale, SpriteEffects.None, 0.5f);
-                spriteBatch.DrawString(font, text, position + Vector2.UnitY * outlineWidth, outlineColor,
-                    Rotation, origin, scale, SpriteEffects.None, 0.5f);
-                spriteBatch.DrawString(font, text, position - Vector2.UnitY * outlineWidth, outlineColor,
-                    Rotation, origin, scale, SpriteEffects.None, 0.5f);
+                return _primaryFace;
+            }
+            foreach (var face in _fallbackFaces)
+            {
+                if (face.Characters.Contains(c))
+                {
+                    return face;
+                }
+            }
+            return _primaryFace;
+        }
+
+        private float ScaleFor(FontFace face)
+        {
+            if (face == _primaryFace)
+            {
+                return _actualScale;
+            }
+            float exact = _targetPixelSize / face.PixelSize;
+            return System.Math.Abs(exact - 1f) <= 0.15f ? 1f : exact;
+        }
+
+        private List<TextRun> SplitText(string text)
+        {
+            var runs = new List<TextRun>();
+            if (string.IsNullOrEmpty(text))
+            {
+                return runs;
+            }
+            FontFace currentFace = null;
+            float currentScale = 0f;
+            var builder = new StringBuilder();
+            foreach (char c in text)
+            {
+                FontFace face = FindFace(c);
+                float scale = ScaleFor(face);
+                if (face != currentFace || scale != currentScale)
+                {
+                    if (builder.Length > 0)
+                    {
+                        runs.Add(new TextRun(currentFace, currentScale, builder.ToString()));
+                    }
+                    builder.Clear();
+                    currentFace = face;
+                    currentScale = scale;
+                }
+                builder.Append(c);
+            }
+            if (builder.Length > 0)
+            {
+                runs.Add(new TextRun(currentFace, currentScale, builder.ToString()));
+            }
+            return runs;
+        }
+
+        private Vector2 MeasureText(string text)
+        {
+            float width = 0f;
+            int lines = 0;
+            foreach (string line in text.Split('\n'))
+            {
+                float lineWidth = 0f;
+                foreach (var run in SplitText(line))
+                {
+                    lineWidth += run.Face.Font.MeasureString(run.Text).X * run.Scale;
+                }
+                width = System.Math.Max(width, lineWidth);
+                lines++;
+            }
+            return new Vector2(width, _currFont.LineSpacing * _actualScale * System.Math.Max(lines, 1));
+        }
+
+        private void BuildRuns()
+        {
+            _lineRuns = new List<List<TextRun>>();
+            foreach (string line in _processedText.Split('\n'))
+            {
+                _lineRuns.Add(SplitText(line));
+            }
+        }
+
+        private static Vector2 AlignedTopLeft(Vector2 position, Vector2 origin)
+        {
+            return new Vector2(
+                (float)System.Math.Round(position.X - origin.X, System.MidpointRounding.AwayFromZero),
+                (float)System.Math.Round(position.Y - origin.Y, System.MidpointRounding.AwayFromZero));
+        }
+
+        private void DrawTextRuns(SpriteBatch spriteBatch, string text, Color color, Vector2 position, Vector2 origin, float rotation, float layerDepth)
+        {
+            if (rotation == 0f)
+            {
+                DrawTextRunsAt(spriteBatch, text, color, AlignedTopLeft(position, origin), rotation, layerDepth);
+                return;
+            }
+            if (_lineRuns == null)
+            {
+                BuildRuns();
+            }
+            float lineHeight = _currFont.LineSpacing * _actualScale;
+            float y = 0f;
+            foreach (var line in _lineRuns)
+            {
+                float x = 0f;
+                foreach (var run in line)
+                {
+                    Vector2 drawPosition = position + Vector2.Transform(new Vector2(x, y) - origin, Matrix.CreateRotationZ(rotation));
+                    spriteBatch.DrawString(run.Face.Font, run.Text, drawPosition, color,
+                        rotation, Vector2.Zero, run.Scale, SpriteEffects.None, layerDepth);
+                    x += run.Face.Font.MeasureString(run.Text).X * run.Scale;
+                }
+                y += lineHeight;
+            }
+        }
+
+        private void DrawTextRunsAt(SpriteBatch spriteBatch, string text, Color color, Vector2 topLeft, float rotation, float layerDepth)
+        {
+            if (_lineRuns == null)
+            {
+                BuildRuns();
+            }
+            float lineHeight = _currFont.LineSpacing * _actualScale;
+            float y = 0f;
+            foreach (var line in _lineRuns)
+            {
+                float x = 0f;
+                foreach (var run in line)
+                {
+                    Vector2 offset = new Vector2(x, y);
+                    if (rotation != 0f)
+                    {
+                        offset = Vector2.Transform(offset, Matrix.CreateRotationZ(rotation));
+                    }
+                    spriteBatch.DrawString(run.Face.Font, run.Text, topLeft + offset, color,
+                        rotation, Vector2.Zero, run.Scale, SpriteEffects.None, layerDepth);
+                    x += run.Face.Font.MeasureString(run.Text).X * run.Scale;
+                }
+                y += lineHeight;
+            }
+        }
+
+        private readonly struct TextRun
+        {
+            public readonly FontFace Face;
+            public readonly float Scale;
+            public readonly string Text;
+
+            public TextRun(FontFace face, float scale, string text)
+            {
+                Face = face;
+                Scale = scale;
+                Text = text;
             }
         }
     }

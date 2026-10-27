@@ -125,7 +125,7 @@ namespace GeonBit.UI.Entities
         /// <summary>
         /// If true, will auto-set the internal list height based on number of options.
         /// </summary>
-        public bool AutoSetListHeight = false;
+        public bool AutoSetListHeight = true;
 
         /// <summary>
         /// If set to true, whenever user select an item it will trigger event but jump back to placeholder value.
@@ -420,6 +420,7 @@ namespace GeonBit.UI.Entities
             // do auto-height
             if (AutoSetListHeight)
             {
+                _selectList.MaxHeight = (int)Size.Y;
                 _selectList.MatchHeightToList();
             }
         }

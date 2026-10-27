@@ -161,13 +161,34 @@ namespace GeonBit.UI.Entities
             if (_isInteractable &&
                 (UserInterface.Active.ActiveEntity == this ||
                 UserInterface.Active.ActiveEntity == _parent ||
-                (UserInterface.Active.ActiveEntity != null && UserInterface.Active.ActiveEntity.IsDeepChildOf(_parent))))
+                (UserInterface.Active.ActiveEntity != null && UserInterface.Active.ActiveEntity.IsDeepChildOf(_parent)) ||
+                IsMouseWheelOverParent()))
             {
                 if (MouseInput.MouseWheelChange != 0)
                 {
                     Value = _value - MouseInput.MouseWheelChange * GetStepSize();
                 }
             }
+        }
+
+        /// <summary>
+        /// Check if the mouse points at the parent entity or one of its children that keeps the wheel for itself.
+        /// </summary>
+        private bool IsMouseWheelOverParent()
+        {
+            Entity target = UserInterface.Active.TargetEntity;
+            if (target == null)
+            {
+                return false;
+            }
+            for (Entity entity = target; entity != null && entity != _parent; entity = entity.Parent)
+            {
+                if (entity is Slider || entity is VerticalScrollbar)
+                {
+                    return false;
+                }
+            }
+            return target == _parent || target.IsDeepChildOf(_parent);
         }
 
         /// <summary>

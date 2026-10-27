@@ -670,12 +670,10 @@ namespace GeonBit.UI
                         spriteBatch.GraphicsDevice.PresentationParameters.DepthStencilFormat, 0,
                         RenderTargetUsage.PreserveContents);
                 }
-                // if didn't create a new render target, clear it
-                else
-                {
-                    spriteBatch.GraphicsDevice.SetRenderTarget(_renderTarget);
-                    spriteBatch.GraphicsDevice.Clear(Color.Transparent);
-                }
+                // bind and clear it, whether it was just created or reused, so the root draws
+                // into the target on the creation frame too
+                spriteBatch.GraphicsDevice.SetRenderTarget(_renderTarget);
+                spriteBatch.GraphicsDevice.Clear(Color.Transparent);
             }
 
             // draw root panel

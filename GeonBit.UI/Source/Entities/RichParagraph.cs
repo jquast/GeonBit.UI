@@ -357,8 +357,9 @@ namespace GeonBit.UI.Entities
                 Color currColor = Color.White;
                 Color currOutlineColor = Color.Black;
                 SpriteFont currFont = null;
-                Vector2 characterSize = GetCharacterActualSize();
-                Vector2 currPosition = new Vector2(_position.X - characterSize.X, _position.Y);
+                Vector2 currPosition = new Vector2(
+                    (float)System.Math.Round(_position.X - _fontOrigin.X),
+                    (float)System.Math.Round(_position.Y - _fontOrigin.Y));
                 int currOutlineWidth = 0;
 
                 // function to reset styles back to defaults
@@ -368,7 +369,6 @@ namespace GeonBit.UI.Entities
                     currFont = _currFont;
                     currOutlineWidth = OutlineWidth;
                     currOutlineColor = UserInterface.Active.DrawUtils.FixColorOpacity(OutlineColor);
-                    characterSize = GetCharacterActualSize();
                 };
                 ResetToDefaults();
 
@@ -412,14 +412,11 @@ namespace GeonBit.UI.Entities
                     // adjust character position
                     if (currCharacter == '\n')
                     {
-                        currPosition.X = _position.X - characterSize.X;
+                        currPosition.X = (float)System.Math.Round(_position.X - _fontOrigin.X);
                         currPosition.Y += currFont.LineSpacing * _actualScale;
+                        continue;
                     }
-                    else
-                    {
-                        iTextIndex++;
-                        currPosition.X += characterSize.X;
-                    }
+                    iTextIndex++;
 
                     // get current char as string
                     var currText = Resources.Instance.GetStringForChar(currCharacter);
@@ -432,10 +429,11 @@ namespace GeonBit.UI.Entities
                     }
 
                     // draw outline
-                    DrawTextOutline(spriteBatch, currText, currOutlineWidth, currFont, _actualScale, currPosition + offset, currOutlineColor, _fontOrigin);
+                    DrawTextOutline(spriteBatch, currText, currOutlineWidth, currFont, _actualScale, currPosition + offset, currOutlineColor, Vector2.Zero);
 
                     // fix color opacity and draw
-                    spriteBatch.DrawString(currFont, currText, currPosition + offset, currColor, 0, _fontOrigin, _actualScale, SpriteEffects.None, 0.5f);
+                    spriteBatch.DrawString(currFont, currText, currPosition + offset, currColor, 0, Vector2.Zero, _actualScale, SpriteEffects.None, 0.5f);
+                    currPosition.X += currFont.MeasureString(currText).X * _actualScale;
                 }
             }
             // if there are no style-changing instructions, just draw the paragraph as-is
