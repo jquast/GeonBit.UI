@@ -786,14 +786,14 @@ namespace GeonBit.UI.Entities
 
         private string FormatTick(float value, float step)
         {
+            if (Math.Abs(value) < 0.00005f)
+                value = 0f;
             if (AxisLabel != null)
                 return AxisLabel(value);
 
             float magnitude = Math.Abs(value);
             int decimals = step >= 1f ? 0 : (int)Math.Ceiling(-Math.Log10(step) - 1e-6);
             decimals = Math.Clamp(decimals, 0, 4);
-            if (Math.Abs(value) < 0.00005f)
-                value = 0f;
             return decimals == 0 && magnitude >= 10000f
                 ? value.ToString("N0")
                 : value.ToString("F" + decimals);
