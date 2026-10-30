@@ -130,6 +130,14 @@ namespace GeonBit.UI.Entities
         private double _scaleStart;
         private double _scaleEnd;
 
+        // A slide holds the plot this many slots to the right of where it belongs and eases it
+        // home, so newly recorded data arrives from off the right edge.
+        private float _shiftFrom;
+        private float _shift;
+        private bool _shiftTween;
+        private double _shiftStart;
+        private double _shiftEnd;
+
         private static readonly float[] Mantissas = { 1f, 2f, 2.5f, 5f, 10f };
 
         public Chart(Vector2? size = null, Anchor anchor = Anchor.Auto, Vector2? offset = null)
@@ -220,6 +228,9 @@ namespace GeonBit.UI.Entities
             foreach (var series in Series)
                 series.Shown = Min;
 
+            _shift = 0f;
+            _shiftTween = false;
+
             if (HasAxes)
             {
                 Range(out float low, out float high);
@@ -239,6 +250,17 @@ namespace GeonBit.UI.Entities
             }
 
             StartValuesTween();
+        }
+
+        /// <summary>Start the plot one or more slots to the right and slide it home.</summary>
+        public void SlideIn(float slots = 1f)
+        {
+            _shiftFrom = slots;
+            _shift = slots;
+            double now = NowMs();
+            _shiftStart = now;
+            _shiftEnd = now + Math.Max(1, AnimateMillis);
+            _shiftTween = true;
         }
 
         public override void Update(ref Entity targetEntity, ref Entity dragTargetEntity,
@@ -577,7 +599,8 @@ namespace GeonBit.UI.Entities
                     continue;
 
                 float width = face.Font.MeasureString(label).X * textScale;
-                int x = LabelX(index, count, plot, centred) - (int)Math.Round(width * 0.5f);
+                int x = LabelX(index, count, plot, centred) + LabelSlide(count, plot, centred)
+                        - (int)Math.Round(width * 0.5f);
                 if (x < rect.X || x + width > rect.Right - 1)
                     continue;
 
@@ -637,6 +660,7 @@ namespace GeonBit.UI.Entities
             for (int i = 0; i < Series.Count; i++)
             {
                 var columns = Resample(Series[i].ShownSamples, plot.Width, sum: false);
+                int offset = SlideOffset(plot, Series[i].ShownSamples.Length, plot.Width - 1);
                 int prior = int.MinValue;
                 for (int x = 0; x < columns.Length; x++)
                 {
@@ -647,17 +671,25 @@ namespace GeonBit.UI.Entities
                     }
                     int y = YOf(columns[x], plot);
                     if (prior == int.MinValue)
-                        FillColumn(spriteBatch, plot, x, y, y + LineWidth - 1, AxisColorOf(i));
+                        FillColumn(spriteBatch, plot, x + offset, y, y + LineWidth - 1, AxisColorOf(i));
                     else
-                        FillColumn(spriteBatch, plot, x, y, prior + LineWidth - 1, AxisColorOf(i));
+                        FillColumn(spriteBatch, plot, x + offset, y, prior + LineWidth - 1, AxisColorOf(i));
                     prior = y;
                 }
             }
         }
 
+        private int SlideOffset(Rectangle plot, int count, int span)
+        {
+            if (_shift <= 0f || count <= 1)
+                return 0;
+            return (int)Math.Round(_shift * (span / (float)(count - 1)));
+        }
+
         private void DrawStackedArea(SpriteBatch spriteBatch, Rectangle plot)
         {
             int width = plot.Width;
+            int offset = SlideOffset(plot, SampleCount(), width - 1);
             var below = new float[width];
             for (int i = 0; i < width; i++)
                 below[i] = 0f;
@@ -673,7 +705,8 @@ namespace GeonBit.UI.Entities
                         continue;
                     }
                     float top = below[x] + columns[x];
-                    FillColumn(spriteBatch, plot, x, YOf(top, plot), YOf(below[x], plot), AxisColorOf(i));
+                    FillColumn(spriteBatch, plot, x + offset, YOf(top, plot), YOf(below[x], plot),
+                               AxisColorOf(i));
                     below[x] = top;
                 }
             }
@@ -689,6 +722,7 @@ namespace GeonBit.UI.Entities
             int slots = (int)Math.Ceiling((double)count / group);
             float slot = (float)plot.Width / slots;
             float groupWidth = Math.Max(1f, slot * 0.72f);
+            int slide = (_shift > 0f) ? (int)Math.Round(_shift * slot) : 0;
 
             if (Kind == ChartKind.StackedColumn)
             {
@@ -698,7 +732,7 @@ namespace GeonBit.UI.Entities
                     var values = Bucket(Series[i].ShownSamples, group, slots);
                     for (int s = 0; s < slots; s++)
                     {
-                        float x = plot.X + (s * slot) + ((slot - groupWidth) * 0.5f);
+                        float x = plot.X + (s * slot) + ((slot - groupWidth) * 0.5f) + slide;
                         if (float.IsNaN(values[s]) || float.IsNaN(bases[s]))
                         {
                             bases[s] = float.NaN;
@@ -722,7 +756,8 @@ namespace GeonBit.UI.Entities
                 {
                     if (float.IsNaN(values[s]))
                         continue;
-                    float x = plot.X + (s * slot) + ((slot - groupWidth) * 0.5f) + (i * (barWidth + gap));
+                    float x = plot.X + (s * slot) + ((slot - groupWidth) * 0.5f) + slide
+                              + (i * (barWidth + gap));
                     FillBar(spriteBatch, plot, x, barWidth, YOf(values[s], plot), zero, AxisColorOf(i));
                 }
             }
@@ -803,6 +838,14 @@ namespace GeonBit.UI.Entities
         {
             float fraction = (value - _shownMin) / (_shownMax - _shownMin);
             return plot.Bottom - 1 - (int)Math.Round(fraction * (plot.Height - 1));
+        }
+
+        private int LabelSlide(int count, Rectangle plot, bool centred)
+        {
+            if (_shift <= 0f || count <= 0)
+                return 0;
+            float span = centred ? (float)plot.Width / count : (float)(plot.Width - 1) / Math.Max(1, count - 1);
+            return (int)Math.Round(_shift * span);
         }
 
         private int LabelX(int index, int count, Rectangle plot, bool centred)
@@ -1198,6 +1241,17 @@ namespace GeonBit.UI.Entities
                     _shownMax = _targetMax;
                     _shownMin = _targetMin;
                     _scaleTween = false;
+                }
+            }
+
+            if (_shiftTween)
+            {
+                float progress = Progress(_shiftStart, _shiftEnd, now);
+                _shift = _shiftFrom * (1f - progress);
+                if (progress >= 1f)
+                {
+                    _shift = 0f;
+                    _shiftTween = false;
                 }
             }
 
