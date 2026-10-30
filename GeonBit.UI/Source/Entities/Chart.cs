@@ -23,6 +23,10 @@ namespace GeonBit.UI.Entities
         Column,
         StackedColumn,
 
+        // One quarter's cost, revenue and profit: the first two series stand side by side and
+        // any later series rides on the second, which is how profit caps the cost.
+        ProfitColumn,
+
         // One value per series, drawn as wedges of a circle with the share beside each label.
         Pie,
     }
@@ -181,7 +185,8 @@ namespace GeonBit.UI.Entities
         public float ShownMin => _shownMin;
 
         public bool HasAxes => Kind == ChartKind.Line || Kind == ChartKind.StackedArea
-                               || Kind == ChartKind.Column || Kind == ChartKind.StackedColumn;
+                               || Kind == ChartKind.Column || Kind == ChartKind.StackedColumn
+                               || Kind == ChartKind.ProfitColumn;
 
         public ChartSeries AddSeries(string label, Color color)
         {
@@ -724,6 +729,33 @@ namespace GeonBit.UI.Entities
             float groupWidth = Math.Max(1f, slot * 0.72f);
             int slide = (_shift > 0f) ? (int)Math.Round(_shift * slot) : 0;
 
+            if (Kind == ChartKind.ProfitColumn)
+            {
+                // Revenue stands beside cost, and the profit cap rides on the cost, so the cap's
+                // top and the revenue's top are the same height.
+                float pairWidth = Math.Max(1f, (groupWidth - 1f) / 2f);
+                var basis = new float[slots];
+                for (int i = 0; i < Series.Count; i++)
+                {
+                    var values = Bucket(Series[i].ShownSamples, group, slots);
+                    bool stacked = i > 1;
+                    for (int s = 0; s < slots; s++)
+                    {
+                        if (float.IsNaN(values[s]))
+                            continue;
+                        float start = stacked ? basis[s] : 0f;
+                        float top = start + values[s];
+                        float x = plot.X + (s * slot) + ((slot - groupWidth) * 0.5f) + slide;
+                        if (i > 0)
+                            x += pairWidth + 1f;
+                        FillBar(spriteBatch, plot, x, pairWidth, YOf(top, plot), YOf(start, plot), AxisColorOf(i));
+                        if (i > 0)
+                            basis[s] = top;
+                    }
+                }
+                return;
+            }
+
             if (Kind == ChartKind.StackedColumn)
             {
                 var bases = new float[slots];
@@ -1055,7 +1087,7 @@ namespace GeonBit.UI.Entities
                     low = 0f;
                     high = 1f;
                 }
-                if (Kind == ChartKind.Column)
+                if (Kind == ChartKind.Column || Kind == ChartKind.ProfitColumn)
                     low = Math.Min(low, 0f);
             }
 
