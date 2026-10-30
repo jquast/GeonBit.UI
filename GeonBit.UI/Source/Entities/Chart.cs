@@ -380,6 +380,11 @@ namespace GeonBit.UI.Entities
                 int right = centreX + span;
 
                 cuts.Clear();
+                // The seam at twelve o'clock is where the last wedge meets the first, and it is
+                // the one boundary no series edge names: without it the narrow rows at the top
+                // are sampled at their midpoint and painted in the first wedge alone.
+                if (centreX > left && centreX < right)
+                    cuts.Add(centreX);
                 for (int i = 0; i < edges.Length - 1; i++)
                 {
                     float boundary = edges[i] * 360f;
