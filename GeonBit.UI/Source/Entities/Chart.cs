@@ -22,6 +22,9 @@ namespace GeonBit.UI.Entities
         StackedArea,
         Column,
         StackedColumn,
+
+        // One value per series, drawn as wedges of a circle with the share beside each label.
+        Pie,
     }
 
     public sealed class ChartSeries
@@ -261,6 +264,12 @@ namespace GeonBit.UI.Entities
                 return;
             }
 
+            if (Kind == ChartKind.Pie)
+            {
+                DrawPie(spriteBatch, rect);
+                return;
+            }
+
             if (_shownMax <= _shownMin)
                 return;
 
@@ -320,6 +329,150 @@ namespace GeonBit.UI.Entities
                     spriteBatch.Draw(Resources.Instance.WhiteTexture, bar, ColorOf(Series[i]));
                 }
             }
+        }
+
+        private void DrawPie(SpriteBatch spriteBatch, Rectangle rect)
+        {
+            float total = 0f;
+            for (int i = 0; i < Series.Count; i++)
+            {
+                float value = Series[i].Shown;
+                if (value > 0f && !float.IsNaN(value))
+                    total += value;
+            }
+            if (total <= 0f)
+                return;
+
+            var face = Resources.Instance.CaptionLadder.Pick(LabelSize * GlobalScale);
+            if (face == null)
+                return;
+            float textScale = LabelSize * GlobalScale / face.PixelSize;
+
+            int legendWidth = ShowLegend ? PieLegendWidth(face, textScale, rect.Width) : 0;
+            int diameter = Math.Min(rect.Height, rect.Width - legendWidth) - 2;
+            if (diameter < 8)
+                return;
+            int radius = diameter / 2;
+            int centreX = rect.X + radius + 1;
+            int centreY = rect.Y + (rect.Height / 2);
+
+            var edges = new float[Series.Count];
+            float running = 0f;
+            for (int i = 0; i < Series.Count; i++)
+            {
+                float value = Series[i].Shown;
+                if (value > 0f && !float.IsNaN(value))
+                    running += value;
+                edges[i] = running / total;
+            }
+
+            var cuts = new List<int>();
+            for (int y = centreY - radius; y <= centreY + radius; y++)
+            {
+                int offset = y - centreY;
+                if (offset == 0)
+                    offset = -1;
+                float spanSquared = ((float)radius * radius) - ((float)offset * offset);
+                if (spanSquared <= 0f)
+                    continue;
+                int span = (int)Math.Sqrt(spanSquared);
+                int left = centreX - span;
+                int right = centreX + span;
+
+                cuts.Clear();
+                for (int i = 0; i < edges.Length - 1; i++)
+                {
+                    float boundary = edges[i] * 360f;
+                    if (boundary <= 0f || boundary >= 360f)
+                        continue;
+                    float x = centreX + ((-offset) * MathF.Tan(boundary * MathF.PI / 180f));
+                    if (!(x > left && x < right))
+                        continue;
+                    cuts.Add((int)Math.Round(x));
+                }
+                cuts.Sort();
+
+                int startX = left;
+                foreach (var cut in cuts)
+                {
+                    if (cut <= startX || cut > right)
+                        continue;
+                    int slice = SliceAt(AngleOf(((startX + cut) / 2) - centreX, offset), edges);
+                    spriteBatch.Draw(Resources.Instance.WhiteTexture,
+                        new Rectangle(startX, y, cut - startX, 1), AxisColorOf(slice));
+                    startX = cut;
+                }
+
+                if (startX <= right)
+                {
+                    int slice = SliceAt(AngleOf(((startX + right) / 2) - centreX, offset), edges);
+                    spriteBatch.Draw(Resources.Instance.WhiteTexture,
+                        new Rectangle(startX, y, right - startX + 1, 1), AxisColorOf(slice));
+                }
+            }
+
+            if (legendWidth > 0)
+                DrawPieLegend(spriteBatch, rect, face, textScale, legendWidth, total);
+        }
+
+        private int PieLegendWidth(FontFace face, float textScale, int width)
+        {
+            int widest = 0;
+            foreach (var series in Series)
+            {
+                if (string.IsNullOrEmpty(series.Label))
+                    continue;
+                var text = $"{series.Label}  100%";
+                widest = Math.Max(widest, (int)Math.Ceiling(face.Font.MeasureString(text).X * textScale));
+            }
+            if (widest == 0)
+                return 0;
+            return Math.Min(widest + 16, width / 2);
+        }
+
+        private void DrawPieLegend(SpriteBatch spriteBatch, Rectangle rect, FontFace face, float textScale,
+                                   int legendWidth, float total)
+        {
+            int swatch = Math.Max(3, (int)Math.Round(6 * GlobalScale));
+            float lineHeight = (face.PixelSize * textScale) + 4;
+            float left = rect.Right - legendWidth + 10;
+            float y = rect.Y + 2;
+
+            for (int i = 0; i < Series.Count; i++)
+            {
+                var series = Series[i];
+                if (string.IsNullOrEmpty(series.Label))
+                    continue;
+                if (y + lineHeight > rect.Bottom)
+                    break;
+
+                spriteBatch.Draw(Resources.Instance.WhiteTexture,
+                    new Rectangle((int)left, (int)y + 2, swatch, swatch), AxisColorOf(i));
+
+                float value = series.Shown > 0f && !float.IsNaN(series.Shown) ? series.Shown : 0f;
+                int percent = (int)Math.Round((value / total) * 100f);
+                spriteBatch.DrawString(face.Font, $"{series.Label}  {percent}%",
+                    new Vector2(left + swatch + 4, y), TextColor,
+                    0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
+                y += lineHeight;
+            }
+        }
+
+        private static float AngleOf(int dx, int dy)
+        {
+            double degrees = Math.Atan2(dx, -dy) * (180.0 / Math.PI);
+            if (degrees < 0)
+                degrees += 360.0;
+            return (float)degrees;
+        }
+
+        private static int SliceAt(float angle, float[] edges)
+        {
+            float fraction = angle / 360f;
+            for (int i = 0; i < edges.Length; i++)
+                if (fraction < edges[i])
+                    return i;
+            return edges.Length - 1;
         }
 
         private void DrawAxes(SpriteBatch spriteBatch, Rectangle rect)
