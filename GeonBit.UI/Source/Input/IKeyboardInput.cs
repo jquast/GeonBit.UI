@@ -10,6 +10,7 @@
 //-----------------------------------------------------------------------------
 #endregion
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
 
 
 namespace GeonBit.UI
@@ -40,6 +41,19 @@ namespace GeonBit.UI
         /// </summary>
         /// <param name="gameTime">Update frame game time.</param>
         void Update(GameTime gameTime);
+
+        /// <summary>
+        /// Queue a key press captured from the platform's event stream, applied by the next update.
+        /// </summary>
+        /// <param name="key">Key that was pressed.</param>
+        void PushKey(Keys key);
+
+        /// <summary>
+        /// Queue a typed character captured from the platform's event stream, applied by the next
+        /// update's text input.
+        /// </summary>
+        /// <param name="character">Character that was typed.</param>
+        void PushText(char character);
 
         /// <summary>
         /// Get textual input from keyboard.

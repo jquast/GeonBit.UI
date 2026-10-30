@@ -7,6 +7,7 @@
 // Since: 2016.
 //-----------------------------------------------------------------------------
 #endregion
+using System.Collections.Generic;
 using GeonBit.UI.Entities;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -68,6 +69,18 @@ namespace GeonBit.UI
         // if true, will perform a click event next update
         bool _clickNextUpdate = false;
 
+        // Keys and characters captured from the platform's event stream, pushed by the game before
+        // this provider is updated: a key tapped inside one frame gap leaves no state transition.
+        readonly List<Keys> _pushedKeys = new List<Keys>();
+        Queue<char> _nextText = new Queue<char>();
+        Queue<char> _eventText = new Queue<char>();
+
+        /// <summary>
+        /// When set, typed characters arrive through PushText and the state-derived character path
+        /// is limited to the special keys. Set by a game that captures the platform's text events.
+        /// </summary>
+        public bool TextFromEvents = false;
+
         /// <summary>
         /// Create the input helper.
         /// </summary>
@@ -112,6 +125,34 @@ namespace GeonBit.UI
             // get new states
             _newMouseState = Mouse.GetState();
             _newKeyboardState = Keyboard.GetState();
+
+            // A press and release inside one tick leaves no transition in the polled state, so the
+            // captured keys are folded into this update and read as a press exactly once.
+            if (_pushedKeys.Count > 0)
+            {
+                var pressed = new List<Keys>(_newKeyboardState.GetPressedKeys());
+                var previous = new List<Keys>(_oldKeyboardState.GetPressedKeys());
+                foreach (Keys key in _pushedKeys)
+                {
+                    if (!pressed.Contains(key))
+                    {
+                        pressed.Add(key);
+                    }
+                }
+                // A pushed key is a fresh press even when the same key was pushed last tick, so
+                // the previous state must not carry it.
+                previous.RemoveAll(key => _pushedKeys.Contains(key));
+                _newKeyboardState = new KeyboardState(pressed.ToArray());
+                _oldKeyboardState = new KeyboardState(previous.ToArray());
+                _pushedKeys.Clear();
+            }
+
+            // One tick of characters: the focused field drains what this update carries, and the
+            // swap drops anything no field took, so typing with nothing focused is not replayed.
+            _eventText.Clear();
+            Queue<char> incoming = _nextText;
+            _nextText = _eventText;
+            _eventText = incoming;
 
             // perform click emulation
             if (_clickNextUpdate) {
@@ -167,6 +208,23 @@ namespace GeonBit.UI
         }
 
         /// <summary>
+        /// Queue a key press captured from the platform's event stream, applied by the next update.
+        /// </summary>
+        public void PushKey(Keys key)
+        {
+            _pushedKeys.Add(key);
+        }
+
+        /// <summary>
+        /// Queue a typed character captured from the platform's event stream, applied by the next
+        /// update's text input.
+        /// </summary>
+        public void PushText(char character)
+        {
+            _nextText.Enqueue(character);
+        }
+
+        /// <summary>
         /// Move the cursor to be at the center of the screen.
         /// </summary>
         /// <param name="pos">New mouse position.</param>
@@ -198,7 +256,19 @@ namespace GeonBit.UI
         /// <param name="key">Key code that is being pressed on this frame.</param>
         protected void OnKeyPressed(Keys key)
         {
+            if (TextFromEvents && !IsTextControlKey(key))
+            {
+                return;
+            }
             NewKeyTextInput(key);
+        }
+
+        // The keys whose meaning is a command rather than a character. With TextFromEvents set,
+        // everything else arrives as text and must not also be derived from the key.
+        private static bool IsTextControlKey(Keys key)
+        {
+            return key == Keys.Back || key == Keys.Delete || key == Keys.Left
+                || key == Keys.Right || key == Keys.Up || key == Keys.Down || key == Keys.Enter;
         }
 
         /// <summary>
@@ -437,6 +507,14 @@ namespace GeonBit.UI
         /// <returns>String after text input applied on it.</returns>
         public string GetTextInput(string txt, int lineWidth, ref int pos)
         {
+            // Every character captured since the last update is applied here. The state-derived
+            // path below can only carry one per pass, which is what lost all but the last key when
+            // several landed in one tick.
+            while (_eventText.Count > 0)
+            {
+                txt = ApplyTextInput(txt, lineWidth, ref pos, _eventText.Dequeue());
+            }
+
             // if need to skip due to cooldown time
             if (!_newKeyIsPressed && _keyboardInputCooldown > 0f)
             {
@@ -449,6 +527,11 @@ namespace GeonBit.UI
                 return txt;
             }
 
+            return ApplyTextInput(txt, lineWidth, ref pos, _currCharacterInput);
+        }
+
+        private static string ApplyTextInput(string txt, int lineWidth, ref int pos, char character)
+        {
             // get default position
             if (pos == -1)
             {
@@ -456,7 +539,7 @@ namespace GeonBit.UI
             }
 
             // handle special chars
-            switch (_currCharacterInput)
+            switch (character)
             {
                 case (char)SpecialChars.ArrowLeft:
                     if (--pos < 0) { pos = 0; }
@@ -485,7 +568,7 @@ namespace GeonBit.UI
             }
 
             // add current character
-            return txt.Insert(pos++, _currCharacterInput.ToString());
+            return txt.Insert(pos++, character.ToString());
         }
 
         /// <summary>
